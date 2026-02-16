@@ -6,6 +6,8 @@ output/
 *.csv
 *.xlsx
 *.xls
+!output/
+!output/child_visits_actions_01_resolved_other_v3.csv
 
 # Local temp files
 _tmp_input_copy.xlsx

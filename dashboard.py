@@ -79,11 +79,14 @@ def load_actions(path: Path) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_actions_from_source(source: str) -> pd.DataFrame:
-    lowered = source.lower()
-    if lowered.endswith((".xlsx", ".xlsm", ".xls")):
-        return pd.read_excel(source, sheet_name=0)
-    return pd.read_csv(source, low_memory=False)
+def load_actions_from_bytes(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    lower_name = file_name.lower()
+    buffer = BytesIO(file_bytes)
+    if lower_name.endswith(".csv"):
+        return pd.read_csv(buffer, low_memory=False)
+    if lower_name.endswith((".xlsx", ".xlsm", ".xls")):
+        return pd.read_excel(buffer, sheet_name=0)
+    raise ValueError("Unsupported file format. Please upload CSV or Excel (.xlsx/.xlsm/.xls).")
 
 
 def summarize_recommendations(
@@ -584,28 +587,28 @@ def main() -> None:
     st.title("Feastables Needs Assessment Dashboard")
     st.caption("Gender-split recommendation visuals for decision making")
 
-    data_source = ""
-    if ACTIONS_FILE.exists():
-        df = load_actions(ACTIONS_FILE)
-        data_source = str(ACTIONS_FILE)
-    else:
-        secret_source = st.secrets.get("ACTIONS_DATA_SOURCE", "").strip()
-        if secret_source:
-            try:
-                df = load_actions_from_source(secret_source)
-                data_source = "ACTIONS_DATA_SOURCE"
-            except Exception as exc:
-                st.error(f"Could not read `ACTIONS_DATA_SOURCE`: {exc}")
-                st.stop()
-        else:
-            st.error(f"Missing input file: {ACTIONS_FILE}")
-            st.info(
-                "Run `python feastables.py` to generate outputs locally, or configure "
-                "`ACTIONS_DATA_SOURCE` in Streamlit secrets to a private CSV/Excel source."
-            )
-            st.stop()
+    uploaded_actions = st.sidebar.file_uploader(
+        "Upload actions file",
+        type=["csv", "xlsx", "xlsm", "xls"],
+        help="Upload actions data as CSV or Excel when local output files are not available.",
+    )
 
-    st.sidebar.caption(f"Data source: {data_source}")
+    if uploaded_actions is not None:
+        try:
+            df = load_actions_from_bytes(uploaded_actions.getvalue(), uploaded_actions.name)
+            st.sidebar.success(f"Using uploaded file: {uploaded_actions.name}")
+        except Exception as exc:
+            st.error(f"Could not read uploaded file: {exc}")
+            st.stop()
+    elif ACTIONS_FILE.exists():
+        df = load_actions(ACTIONS_FILE)
+    else:
+        st.error(f"Missing input file: {ACTIONS_FILE}")
+        st.info(
+            "Upload `child_visits_actions_01_resolved_other_v3.csv` using the sidebar, "
+            "or run `python feastables.py` locally to generate outputs."
+        )
+        st.stop()
 
     filtered = apply_filters(df)
     st.sidebar.header("Display")
