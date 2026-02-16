@@ -78,6 +78,11 @@ def load_actions(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False)
 
 
+@st.cache_data(show_spinner=False)
+def load_actions_from_bytes(file_bytes: bytes) -> pd.DataFrame:
+    return pd.read_csv(BytesIO(file_bytes), low_memory=False)
+
+
 def summarize_recommendations(
     df: pd.DataFrame,
     group: str,
@@ -576,12 +581,25 @@ def main() -> None:
     st.title("Feastables Needs Assessment Dashboard")
     st.caption("Gender-split recommendation visuals for decision making")
 
-    if not ACTIONS_FILE.exists():
+    uploaded_actions = st.sidebar.file_uploader(
+        "Upload actions CSV",
+        type=["csv"],
+        help="Use this on Streamlit Cloud if local output files are not available.",
+    )
+
+    if uploaded_actions is not None:
+        df = load_actions_from_bytes(uploaded_actions.getvalue())
+        st.sidebar.success("Using uploaded actions CSV.")
+    elif ACTIONS_FILE.exists():
+        df = load_actions(ACTIONS_FILE)
+    else:
         st.error(f"Missing input file: {ACTIONS_FILE}")
-        st.info("Run `python feastables.py` first to generate outputs.")
+        st.info(
+            "Upload `child_visits_actions_01_resolved_other_v3.csv` using the sidebar, "
+            "or run `python feastables.py` locally to generate outputs."
+        )
         st.stop()
 
-    df = load_actions(ACTIONS_FILE)
     filtered = apply_filters(df)
     st.sidebar.header("Display")
     top_n = st.sidebar.slider("Top recommendations / flows", min_value=5, max_value=50, value=15, step=1)
