@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+
+# Local data and generated artifacts
+output/
+*.csv
+*.xlsx
+*.xls
+
+# Local temp files
+_tmp_input_copy.xlsx
