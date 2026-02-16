@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from io import BytesIO
 from itertools import product
 from pathlib import Path
 
@@ -76,17 +75,6 @@ def _compute_unique_children_metric(df: pd.DataFrame) -> tuple[str, str]:
 @st.cache_data(show_spinner=False)
 def load_actions(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False)
-
-
-@st.cache_data(show_spinner=False)
-def load_actions_from_bytes(file_bytes: bytes, file_name: str) -> pd.DataFrame:
-    lower_name = file_name.lower()
-    buffer = BytesIO(file_bytes)
-    if lower_name.endswith(".csv"):
-        return pd.read_csv(buffer, low_memory=False)
-    if lower_name.endswith((".xlsx", ".xlsm", ".xls")):
-        return pd.read_excel(buffer, sheet_name=0)
-    raise ValueError("Unsupported file format. Please upload CSV or Excel (.xlsx/.xlsm/.xls).")
 
 
 def summarize_recommendations(
@@ -587,27 +575,11 @@ def main() -> None:
     st.title("Feastables Needs Assessment Dashboard")
     st.caption("Gender-split recommendation visuals for decision making")
 
-    uploaded_actions = st.sidebar.file_uploader(
-        "Upload actions file",
-        type=["csv", "xlsx", "xlsm", "xls"],
-        help="Upload actions data as CSV or Excel when local output files are not available.",
-    )
-
-    if uploaded_actions is not None:
-        try:
-            df = load_actions_from_bytes(uploaded_actions.getvalue(), uploaded_actions.name)
-            st.sidebar.success(f"Using uploaded file: {uploaded_actions.name}")
-        except Exception as exc:
-            st.error(f"Could not read uploaded file: {exc}")
-            st.stop()
-    elif ACTIONS_FILE.exists():
+    if ACTIONS_FILE.exists():
         df = load_actions(ACTIONS_FILE)
     else:
         st.error(f"Missing input file: {ACTIONS_FILE}")
-        st.info(
-            "Upload `child_visits_actions_01_resolved_other_v3.csv` using the sidebar, "
-            "or run `python feastables.py` locally to generate outputs."
-        )
+        st.info("Run `python feastables.py` first to generate outputs.")
         st.stop()
 
     filtered = apply_filters(df)
