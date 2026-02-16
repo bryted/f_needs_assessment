@@ -79,8 +79,14 @@ def load_actions(path: Path) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_actions_from_bytes(file_bytes: bytes) -> pd.DataFrame:
-    return pd.read_csv(BytesIO(file_bytes), low_memory=False)
+def load_actions_from_bytes(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    lower_name = file_name.lower()
+    buffer = BytesIO(file_bytes)
+    if lower_name.endswith(".csv"):
+        return pd.read_csv(buffer, low_memory=False)
+    if lower_name.endswith((".xlsx", ".xlsm", ".xls")):
+        return pd.read_excel(buffer, sheet_name=0)
+    raise ValueError("Unsupported file format. Please upload CSV or Excel (.xlsx/.xlsm/.xls).")
 
 
 def summarize_recommendations(
@@ -582,14 +588,18 @@ def main() -> None:
     st.caption("Gender-split recommendation visuals for decision making")
 
     uploaded_actions = st.sidebar.file_uploader(
-        "Upload actions CSV",
-        type=["csv"],
-        help="Use this on Streamlit Cloud if local output files are not available.",
+        "Upload actions file",
+        type=["csv", "xlsx", "xlsm", "xls"],
+        help="Upload actions data as CSV or Excel when local output files are not available.",
     )
 
     if uploaded_actions is not None:
-        df = load_actions_from_bytes(uploaded_actions.getvalue())
-        st.sidebar.success("Using uploaded actions CSV.")
+        try:
+            df = load_actions_from_bytes(uploaded_actions.getvalue(), uploaded_actions.name)
+            st.sidebar.success(f"Using uploaded file: {uploaded_actions.name}")
+        except Exception as exc:
+            st.error(f"Could not read uploaded file: {exc}")
+            st.stop()
     elif ACTIONS_FILE.exists():
         df = load_actions(ACTIONS_FILE)
     else:
